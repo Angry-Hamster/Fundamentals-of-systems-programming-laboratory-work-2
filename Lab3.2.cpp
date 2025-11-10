@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 #include "framework.h"
-#include "Lab3.2.h"
+#include "Resource.h"
 
 using namespace std;
 
@@ -20,11 +20,10 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
-int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-	_In_opt_ HINSTANCE hPrevInstance,
-	_In_ LPWSTR    lpCmdLine,
-	_In_ int       nCmdShow)
+
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine,	_In_ int nCmdShow)
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
@@ -59,11 +58,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	return (int)msg.wParam;
 }
 
-//
-//  FUNCTION: MyRegisterClass()
-//
-//  PURPOSE: Registers the window class.
-//
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
 	WNDCLASSEXW wcex;
@@ -85,16 +79,6 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	return RegisterClassExW(&wcex);
 }
 
-//
-//   FUNCTION: InitInstance(HINSTANCE, int)
-//
-//   PURPOSE: Saves instance handle and creates main window
-//
-//   COMMENTS:
-//
-//        In this function, we save the instance handle in a global variable and
-//        create and display the main program window.
-//
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
 	hInst = hInstance; // Store instance handle in our global variable
@@ -112,17 +96,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 	return TRUE;
 }
-
-//
-//  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
-//
-//  PURPOSE: Processes messages for the main window.
-//
-//  WM_COMMAND  - process the application menu
-//  WM_PAINT    - Paint the main window
-//  WM_DESTROY  - post a quit message and return
-//
-//
 
 wstring StringToWide(const string& str) {
 	if (str.empty()) return wstring();
@@ -235,6 +208,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		// Parse the menu selections:
 		switch (wmId)
 		{
+		case ID_EXIT: PostQuitMessage(0); break;
+		case ID_SETTING: DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTING), hWnd, SettingsDlgProc); break;
+
 		case 32771: scale = 1 * scale / abs(scale); break;
 		case 32772: scale = 2 * scale / abs(scale); break;
 		case 32773: scale = 3 * scale / abs(scale); break;
@@ -279,15 +255,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		Polygon(hdcMem, square, size(square));
 		Polygon(hdcMem, triangle, size(triangle));
 
-		wstring wideText = StringToWide("default_coord x: " + to_string(default_coord.x) + " y: " + to_string(default_coord.y));
-		TextOutW(hdcMem, 0, 0, wideText.c_str(), (int)wideText.length());
-
-		wideText = StringToWide("mouse_coord x: " + to_string(mouse_coord.x) + " y: " + to_string(mouse_coord.y));
-		TextOutW(hdcMem, 0, 15, wideText.c_str(), (int)wideText.length());
-
-		wideText = StringToWide("wmId: " + to_string(wmId));
-		TextOutW(hdcMem, 0, 30, wideText.c_str(), (int)wideText.length());
-
 		BitBlt(hdc, ps.rcPaint.left, ps.rcPaint.top, width, height,
 			hdcMem, 0, 0, SRCCOPY);
 
@@ -305,4 +272,93 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
+}
+
+INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    // default color matches your current defaults in WndProc
+    static int defR = 0;
+	static int defG = 0;
+	static int defB = 0;
+
+    switch (message)
+    {
+    case WM_INITDIALOG:
+    {
+        // initialize scrollbars: range 0..255 and initial positions
+        HWND hR = GetDlgItem(hDlg, IDC_SCROLLBAR4);
+        HWND hG = GetDlgItem(hDlg, IDC_SCROLLBAR5);
+        HWND hB = GetDlgItem(hDlg, IDC_SCROLLBAR6);
+
+        // set range and position
+        SetScrollRange(hR, SB_CTL, 0, 255, FALSE);
+        SetScrollRange(hG, SB_CTL, 0, 255, FALSE);
+        SetScrollRange(hB, SB_CTL, 0, 255, FALSE);
+
+        SetScrollPos(hR, SB_CTL, defR, TRUE);
+        SetScrollPos(hG, SB_CTL, defG, TRUE);
+        SetScrollPos(hB, SB_CTL, defB, TRUE);
+
+        // update numeric labels
+        SetDlgItemInt(hDlg, IDC_RVALUE, defR, TRUE);
+        SetDlgItemInt(hDlg, IDC_GVALUE, defG, TRUE);
+        SetDlgItemInt(hDlg, IDC_BVALUE, defB, TRUE);
+
+        return (INT_PTR)TRUE;
+    }
+
+    case WM_HSCROLL:
+    {
+        // lParam is the scrollbar HWND for control scrollbars
+        HWND hScroll = (HWND)lParam;
+        if (hScroll == NULL)
+            break;
+
+        // get current position (SBM_GETPOS is reliable)
+        int pos = (int)SendMessage(hScroll, SBM_GETPOS, 0, 0);
+        // ensure it's limited to 0..255
+        if (pos < 0) pos = 0;
+        if (pos > 255) pos = 255;
+        // apply and redraw thumb
+        SetScrollPos(hScroll, SB_CTL, pos, TRUE);
+
+        // update the matching numeric label
+        int id = GetDlgCtrlID(hScroll);
+        if (id == IDC_SCROLLBAR4) SetDlgItemInt(hDlg, IDC_RVALUE, pos, FALSE);
+        else if (id == IDC_SCROLLBAR5) SetDlgItemInt(hDlg, IDC_GVALUE, pos, FALSE);
+        else if (id == IDC_SCROLLBAR6) SetDlgItemInt(hDlg, IDC_BVALUE, pos, FALSE);
+
+        return (INT_PTR)TRUE;
+    }
+
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+        {
+            if (LOWORD(wParam) == IDOK)
+            {
+                // read final values
+                BOOL ok;
+                int r = GetDlgItemInt(hDlg, IDC_RVALUE, &ok, FALSE);
+                int g = GetDlgItemInt(hDlg, IDC_GVALUE, &ok, FALSE);
+                int b = GetDlgItemInt(hDlg, IDC_BVALUE, &ok, FALSE);
+
+                // clamp just in case
+                r = max(0, min(255, r));
+                g = max(0, min(255, g));
+                b = max(0, min(255, b));
+
+                // Optionally communicate to parent window:
+                // Parent can handle WM_APP + 1 and extract RGB from wParam:
+                // wParam = (r << 16) | (g << 8) | b
+                HWND parent = GetParent(hDlg);
+                if (parent)
+                    SendMessage(parent, WM_APP + 1, (WPARAM)((r << 16) | (g << 8) | b), 0);
+            }
+
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+        break;
+    }
+    return (INT_PTR)FALSE;
 }
