@@ -23,7 +23,7 @@ INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
 
-int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine,	_In_ int nCmdShow)
+int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
@@ -115,7 +115,8 @@ struct Color {
 
 	// Parameterized constructor
 	Color(uint8_t red, uint8_t green, uint8_t blue)
-		: r(red), g(green), b(blue){}
+		: r(red), g(green), b(blue) {
+	}
 
 	void set(uint8_t red, uint8_t green, uint8_t blue)
 	{
@@ -210,6 +211,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 		case ID_EXIT: PostQuitMessage(0); break;
 		case ID_SETTING: DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTING), hWnd, SettingsDlgProc); break;
+		//case ID_SETTING: DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG1), hWnd, SettingsDlgProc); break;
 
 		case 32771: scale = 1 * scale / abs(scale); break;
 		case 32772: scale = 2 * scale / abs(scale); break;
@@ -219,7 +221,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 		case 32778: border.set(30, 122, 27); break;
 		case 32779: border.set(240, 240, 14); break;
-		case 32780: border.set(159, 20, 201); break; 
+		case 32780: border.set(159, 20, 201); break;
 		case 32781: border.set(181, 37, 14); break;
 
 		case 32782: filling.set(50, 142, 47); break;
@@ -240,10 +242,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		int height = ps.rcPaint.bottom - ps.rcPaint.top;
 
 		HDC hdcMem = CreateCompatibleDC(hdc);
-		HBITMAP hbmNew = CreateCompatibleBitmap(hdc, width, height); 
-		HBITMAP hbmOld = (HBITMAP)SelectObject(hdcMem, hbmNew); 
+		HBITMAP hbmNew = CreateCompatibleBitmap(hdc, width, height);
+		HBITMAP hbmOld = (HBITMAP)SelectObject(hdcMem, hbmNew);
 
-		RECT memRect = { 0, 0, width, height }; 
+		RECT memRect = { 0, 0, width, height };
 		FillRect(hdcMem, &memRect, (HBRUSH)(COLOR_WINDOW + 1));
 
 		HPEN hOutlinePen = CreatePen(PS_SOLID, 2, border.rgb());
@@ -258,8 +260,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		BitBlt(hdc, ps.rcPaint.left, ps.rcPaint.top, width, height,
 			hdcMem, 0, 0, SRCCOPY);
 
-		SelectObject(hdcMem, hbmOld); 
-		DeleteObject(hbmNew); 
+		SelectObject(hdcMem, hbmOld);
+		DeleteObject(hbmNew);
 		DeleteDC(hdcMem);
 
 		EndPaint(hWnd, &ps);
@@ -276,89 +278,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    // default color matches your current defaults in WndProc
-    static int defR = 0;
-	static int defG = 0;
-	static int defB = 0;
+	switch (message)
+	{
+	case WM_INITDIALOG:
+		return 0;
 
-    switch (message)
-    {
-    case WM_INITDIALOG:
-    {
-        // initialize scrollbars: range 0..255 and initial positions
-        HWND hR = GetDlgItem(hDlg, IDC_SCROLLBAR4);
-        HWND hG = GetDlgItem(hDlg, IDC_SCROLLBAR5);
-        HWND hB = GetDlgItem(hDlg, IDC_SCROLLBAR6);
+	case WM_COMMAND:
+		switch (LOWORD(wParam))
+		{
+		case IDOK:
+			EndDialog(hDlg, IDOK);
+			return 0;
 
-        // set range and position
-        SetScrollRange(hR, SB_CTL, 0, 255, FALSE);
-        SetScrollRange(hG, SB_CTL, 0, 255, FALSE);
-        SetScrollRange(hB, SB_CTL, 0, 255, FALSE);
+		case IDCANCEL:
+			EndDialog(hDlg, IDCANCEL);
+			return 0;
+		}
+		break;
 
-        SetScrollPos(hR, SB_CTL, defR, TRUE);
-        SetScrollPos(hG, SB_CTL, defG, TRUE);
-        SetScrollPos(hB, SB_CTL, defB, TRUE);
-
-        // update numeric labels
-        SetDlgItemInt(hDlg, IDC_RVALUE, defR, TRUE);
-        SetDlgItemInt(hDlg, IDC_GVALUE, defG, TRUE);
-        SetDlgItemInt(hDlg, IDC_BVALUE, defB, TRUE);
-
-        return (INT_PTR)TRUE;
-    }
-
-    case WM_HSCROLL:
-    {
-        // lParam is the scrollbar HWND for control scrollbars
-        HWND hScroll = (HWND)lParam;
-        if (hScroll == NULL)
-            break;
-
-        // get current position (SBM_GETPOS is reliable)
-        int pos = (int)SendMessage(hScroll, SBM_GETPOS, 0, 0);
-        // ensure it's limited to 0..255
-        if (pos < 0) pos = 0;
-        if (pos > 255) pos = 255;
-        // apply and redraw thumb
-        SetScrollPos(hScroll, SB_CTL, pos, TRUE);
-
-        // update the matching numeric label
-        int id = GetDlgCtrlID(hScroll);
-        if (id == IDC_SCROLLBAR4) SetDlgItemInt(hDlg, IDC_RVALUE, pos, FALSE);
-        else if (id == IDC_SCROLLBAR5) SetDlgItemInt(hDlg, IDC_GVALUE, pos, FALSE);
-        else if (id == IDC_SCROLLBAR6) SetDlgItemInt(hDlg, IDC_BVALUE, pos, FALSE);
-
-        return (INT_PTR)TRUE;
-    }
-
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-        {
-            if (LOWORD(wParam) == IDOK)
-            {
-                // read final values
-                BOOL ok;
-                int r = GetDlgItemInt(hDlg, IDC_RVALUE, &ok, FALSE);
-                int g = GetDlgItemInt(hDlg, IDC_GVALUE, &ok, FALSE);
-                int b = GetDlgItemInt(hDlg, IDC_BVALUE, &ok, FALSE);
-
-                // clamp just in case
-                r = max(0, min(255, r));
-                g = max(0, min(255, g));
-                b = max(0, min(255, b));
-
-                // Optionally communicate to parent window:
-                // Parent can handle WM_APP + 1 and extract RGB from wParam:
-                // wParam = (r << 16) | (g << 8) | b
-                HWND parent = GetParent(hDlg);
-                if (parent)
-                    SendMessage(parent, WM_APP + 1, (WPARAM)((r << 16) | (g << 8) | b), 0);
-            }
-
-            EndDialog(hDlg, LOWORD(wParam));
-            return (INT_PTR)TRUE;
-        }
-        break;
-    }
-    return (INT_PTR)FALSE;
+	}
+	return 0;
 }
