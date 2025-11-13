@@ -3,6 +3,7 @@
 
 #include <string>
 #include <iostream>
+#include <vector>
 #include "framework.h"
 #include "Resource.h"
 
@@ -106,19 +107,19 @@ wstring StringToWide(const string& str) {
 }
 
 struct Color {
-	uint8_t r; // Red component (0-255)
-	uint8_t g; // Green component (0-255)
-	uint8_t b; // Blue component (0-255)
+	int r=0; // Red component (0-255)
+	int g=0; // Green component (0-255)
+	int b=0; // Blue component (0-255)
 
 	// Default constructor
 	Color() : r(0), g(0), b(0) {}
 
 	// Parameterized constructor
-	Color(uint8_t red, uint8_t green, uint8_t blue)
+	Color(int red, int green, int blue)
 		: r(red), g(green), b(blue) {
 	}
 
-	void set(uint8_t red, uint8_t green, uint8_t blue)
+	void set(int red, int green, int blue)
 	{
 		r = red;
 		g = green;
@@ -129,6 +130,63 @@ struct Color {
 	{
 		return RGB(r, g, b);
 	}
+
+	int& operator[](size_t idx)
+	{
+		switch (idx)
+		{
+		case 0: return r;
+		case 1: return g;
+		case 2: return b;
+		default: throw std::out_of_range("Color index out of range (valid: 0..2)");
+		}
+	}
+
+	// Const version for reads: int v = col[1];
+	const int& operator[](size_t idx) const
+	{
+		switch (idx)
+		{
+		case 0: return r;
+		case 1: return g;
+		case 2: return b;
+		default: throw std::out_of_range("Color index out of range (valid: 0..2)");
+		}
+	}
+};
+
+int brush[] = { PS_DASH, PS_DOT, PS_DASHDOT };
+
+class shape_info
+{
+public:
+	int scale=1;
+	Color border;
+	Color filling;
+	vector<int> brush;
+
+	shape_info() = default;
+
+	// Return a deep copy of this shape_info
+	shape_info clone() const
+	{
+		shape_info copy;
+		copy.scale = scale;
+		copy.border = border;
+		copy.filling = filling;
+		copy.brush = brush; // vector copy performs deep copy of elements
+		return copy;
+	}
+
+	shape_info& operator=(const shape_info& other)
+	{
+		if (this == &other) return *this;
+		scale = other.scale;
+		border = other.border;
+		filling = other.filling;
+		brush = other.brush; // vector copy performs deep copy of elements
+		return *this;
+	}
 };
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -138,9 +196,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	static POINT default_coord = { 200, 200 };
 	static POINT mouse_coord = { 0, 0 };
 	static POINT mouse_coord_correction = { 0, 0 };
-	static int scale = 2;
 	static bool lcm = false;
-	static int wmId;
+	static int scale = 2;
 	static Color border(30, 122, 27);
 	static Color filling(50, 142, 47);
 
@@ -205,13 +262,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	break;
 	case WM_COMMAND:
 	{
-		wmId = LOWORD(wParam);
+		int wmId = LOWORD(wParam);
 		// Parse the menu selections:
 		switch (wmId)
 		{
 		case ID_EXIT: PostQuitMessage(0); break;
 		case ID_SETTING: DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTING), hWnd, SettingsDlgProc); break;
-		//case ID_SETTING: DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG1), hWnd, SettingsDlgProc); break;
+			//case ID_SETTING: DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG1), hWnd, SettingsDlgProc); break;
 
 		case 32771: scale = 1 * scale / abs(scale); break;
 		case 32772: scale = 2 * scale / abs(scale); break;
@@ -276,17 +333,85 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+void scrollbarHandler(WPARAM wParam, LPARAM lParam, int scrollbarId, int &value)
 {
+	HWND hScroll = (HWND)lParam;
+	if (GetDlgCtrlID(hScroll) != scrollbarId) return;
+
+	const int MAX_VALUE = 255;
+
+	switch (LOWORD(wParam))
+	{
+		case SB_LINELEFT: value--; break; // click left arrow
+		case SB_LINERIGHT: value++; break; // click right arrow
+		case SB_PAGELEFT: value -= MAX_VALUE / 4; break; // click page left
+		case SB_PAGERIGHT: value += MAX_VALUE / 4; break; // click page right
+		case SB_THUMBTRACK: value = HIWORD(wParam); break; // dragging thumb
+	}
+
+	value = max(0, min(value, MAX_VALUE));
+
+	SetScrollRange(hScroll, SB_CTL, 0, MAX_VALUE, TRUE);
+	SetScrollPos(hScroll, SB_CTL, value, TRUE);
+}
+
+void initScrollbar(HWND hScrollBar, int max, int value)
+{
+	SetScrollRange(hScrollBar, SB_CTL, 0, max, TRUE);
+	SetScrollPos(hScrollBar, SB_CTL, value, TRUE);
+}
+
+int indexOf(int arr[], int seek)
+{
+	for (int i = 0; i < sizeof(arr[0]); ++i)
+	{
+		if (arr[i] == seek) return i;
+	}
+	return -1;
+}
+
+shape_info global_shape_info;
+
+const int IDD_SETTING_BORDER[] = { IDD_SETTING_BORDER_R, IDD_SETTING_BORDER_G, IDD_SETTING_BORDER_B };
+const int IDD_SETTING_BORDER_BAR[] = { IDD_SETTING_BORDER_BAR_R, IDD_SETTING_BORDER_BAR_G, IDD_SETTING_BORDER_BAR_B };
+
+const int IDD_SETTING_FILLING[] = { IDD_SETTING_FILLING_R, IDD_SETTING_FILLING_G, IDD_SETTING_FILLING_B };
+const int IDD_SETTING_FILLING_BAR[] = { IDD_SETTING_FILLING_BAR_R, IDD_SETTING_FILLING_BAR_G, IDD_SETTING_FILLING_BAR_B };
+
+INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{	
+	static shape_info local_shape_info;
+
+
 	switch (message)
 	{
 	case WM_INITDIALOG:
-		return 0;
+	{
+		for (int i = 0; i < sizeof(IDD_SETTING_BORDER_BAR)/sizeof(int); i++) 
+			initScrollbar(GetDlgItem(hDlg, IDD_SETTING_BORDER_BAR[i]), 255, global_shape_info.border[i]);
+		for (int i = 0; i < sizeof(IDD_SETTING_FILLING_BAR) / sizeof(int); i++)
+			initScrollbar(GetDlgItem(hDlg, IDD_SETTING_FILLING_BAR[i]), 255, global_shape_info.filling[i]);
+
+		break;
+	}
+
+	case WM_HSCROLL:
+	{
+		for (int i = 0; i < sizeof(IDD_SETTING_BORDER_BAR) / sizeof(int); i++)
+			scrollbarHandler(wParam, lParam, IDD_SETTING_BORDER_BAR[i], local_shape_info.border[i]);
+		for (int i = 0; i < sizeof(IDD_SETTING_FILLING_BAR) / sizeof(int); i++)
+			scrollbarHandler(wParam, lParam, IDD_SETTING_FILLING_BAR[i], local_shape_info.filling[i]);
+
+		break;
+	}
+
 
 	case WM_COMMAND:
+	{
 		switch (LOWORD(wParam))
 		{
 		case IDOK:
+			global_shape_info = local_shape_info;
 			EndDialog(hDlg, IDOK);
 			return 0;
 
@@ -295,6 +420,7 @@ INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 			return 0;
 		}
 		break;
+	}
 
 	}
 	return 0;
