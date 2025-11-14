@@ -211,7 +211,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 		case ID_EXIT: PostQuitMessage(0); break;
 		case ID_SETTING: DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTING), hWnd, SettingsDlgProc); break;
-		//case ID_SETTING: DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG1), hWnd, SettingsDlgProc); break;
 
 		case 32771: scale = 1 * scale / abs(scale); break;
 		case 32772: scale = 2 * scale / abs(scale); break;
