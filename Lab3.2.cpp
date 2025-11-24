@@ -160,7 +160,7 @@ int brush[] = { PS_DASH, PS_DOT, PS_DASHDOT };
 class shape_info
 {
 public:
-	int scale=1;
+	int scale=0;
 	Color border;
 	Color filling;
 	vector<int> brush;
@@ -189,17 +189,15 @@ public:
 	}
 };
 
+shape_info global_shape_info;
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	InvalidateRect(hWnd, NULL, FALSE);
-
 	static POINT default_coord = { 200, 200 };
 	static POINT mouse_coord = { 0, 0 };
 	static POINT mouse_coord_correction = { 0, 0 };
 	static bool lcm = false;
-	static int scale = 2;
-	static Color border(30, 122, 27);
-	static Color filling(50, 142, 47);
+	int scale = global_shape_info.scale +1;
 
 	static bool on_shape = false;
 	if (on_shape) SetCursor(LoadCursor(NULL, IDC_HAND));
@@ -263,28 +261,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_COMMAND:
 	{
 		int wmId = LOWORD(wParam);
-		// Parse the menu selections:
 		switch (wmId)
 		{
 		case ID_EXIT: PostQuitMessage(0); break;
 		case ID_SETTING: DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTING), hWnd, SettingsDlgProc); break;
-		//case ID_SETTING: DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG1), hWnd, SettingsDlgProc); break;
-
-		case 32771: scale = 1 * scale / abs(scale); break;
-		case 32772: scale = 2 * scale / abs(scale); break;
-		case 32773: scale = 3 * scale / abs(scale); break;
-
-		case 65535: scale = -scale; break;
-
-		case 32778: border.set(30, 122, 27); break;
-		case 32779: border.set(240, 240, 14); break;
-		case 32780: border.set(159, 20, 201); break;
-		case 32781: border.set(181, 37, 14); break;
-
-		case 32782: filling.set(50, 142, 47); break;
-		case 32783: filling.set(255, 255, 34); break;
-		case 32784: filling.set(179, 40, 221); break;
-		case 32785: filling.set(201, 47, 34); break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
@@ -305,10 +285,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		RECT memRect = { 0, 0, width, height };
 		FillRect(hdcMem, &memRect, (HBRUSH)(COLOR_WINDOW + 1));
 
-		HPEN hOutlinePen = CreatePen(PS_SOLID, 2, border.rgb());
+		HPEN hOutlinePen = CreatePen(PS_SOLID, 2, global_shape_info.border.rgb());
 		HPEN hOldPen = (HPEN)SelectObject(hdcMem, hOutlinePen);
 
-		HBRUSH hBrush = CreateSolidBrush(filling.rgb());
+		HBRUSH hBrush = CreateSolidBrush(global_shape_info.filling.rgb());
 		HBRUSH hOldBrush = (HBRUSH)SelectObject(hdcMem, hBrush);
 
 		Polygon(hdcMem, square, size(square));
@@ -330,6 +310,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
+
+	InvalidateRect(hWnd, NULL, FALSE);
 	return 0;
 }
 
@@ -361,7 +343,12 @@ void initScrollbar(HWND hScrollBar, int max, int value)
 	SetScrollPos(hScrollBar, SB_CTL, value, TRUE);
 }
 
-int indexOf(int arr[], int seek)
+void setInputValue(HWND hDlg, int IDC_EDIT_HSCR, int value)
+{
+	SetDlgItemInt(hDlg, IDC_EDIT_HSCR, value, FALSE);
+}
+
+int indexOf(const int arr[], int seek)
 {
 	for (int i = 0; i < sizeof(arr[0]); ++i)
 	{
@@ -370,13 +357,14 @@ int indexOf(int arr[], int seek)
 	return -1;
 }
 
-shape_info global_shape_info;
-
 const int IDD_SETTING_BORDER[] = { IDD_SETTING_BORDER_R, IDD_SETTING_BORDER_G, IDD_SETTING_BORDER_B };
 const int IDD_SETTING_BORDER_BAR[] = { IDD_SETTING_BORDER_BAR_R, IDD_SETTING_BORDER_BAR_G, IDD_SETTING_BORDER_BAR_B };
 
 const int IDD_SETTING_FILLING[] = { IDD_SETTING_FILLING_R, IDD_SETTING_FILLING_G, IDD_SETTING_FILLING_B };
 const int IDD_SETTING_FILLING_BAR[] = { IDD_SETTING_FILLING_BAR_R, IDD_SETTING_FILLING_BAR_G, IDD_SETTING_FILLING_BAR_B };
+
+const int IDD_SETTING_SCALE_X[] = { IDD_SETTING_SCALE_X1, IDD_SETTING_SCALE_X2, IDD_SETTING_SCALE_X3 };
+
 
 INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {	
@@ -387,10 +375,17 @@ INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 	{
 	case WM_INITDIALOG:
 	{
-		for (int i = 0; i < sizeof(IDD_SETTING_BORDER_BAR)/sizeof(int); i++) 
+		for (int i = 0; i < sizeof(IDD_SETTING_BORDER_BAR)/sizeof(IDD_SETTING_BORDER_BAR[0]); i++)
 			initScrollbar(GetDlgItem(hDlg, IDD_SETTING_BORDER_BAR[i]), 255, global_shape_info.border[i]);
-		for (int i = 0; i < sizeof(IDD_SETTING_FILLING_BAR) / sizeof(int); i++)
+		for (int i = 0; i < sizeof(IDD_SETTING_FILLING_BAR) / sizeof(IDD_SETTING_FILLING_BAR[0]); i++)
 			initScrollbar(GetDlgItem(hDlg, IDD_SETTING_FILLING_BAR[i]), 255, global_shape_info.filling[i]);
+
+		for (int i = 0; i < sizeof(IDD_SETTING_BORDER) / sizeof(IDD_SETTING_BORDER[0]); i++)
+			setInputValue(hDlg, IDD_SETTING_BORDER[i], global_shape_info.border[i]);
+		for (int i = 0; i < sizeof(IDD_SETTING_FILLING) / sizeof(IDD_SETTING_BORDER[0]); i++)
+			setInputValue(hDlg, IDD_SETTING_FILLING[i], global_shape_info.filling[i]);
+
+		CheckRadioButton(hDlg, IDD_SETTING_SCALE_X[0], IDD_SETTING_SCALE_X[(sizeof(IDD_SETTING_SCALE_X) / sizeof(IDD_SETTING_SCALE_X[0])) - 1], IDD_SETTING_SCALE_X[global_shape_info.scale]);
 
 		break;
 	}
@@ -402,13 +397,51 @@ INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 		for (int i = 0; i < sizeof(IDD_SETTING_FILLING_BAR) / sizeof(int); i++)
 			scrollbarHandler(wParam, lParam, IDD_SETTING_FILLING_BAR[i], local_shape_info.filling[i]);
 
+		for (int i = 0; i < sizeof(IDD_SETTING_BORDER) / sizeof(int); i++)
+			setInputValue(hDlg, IDD_SETTING_BORDER[i], local_shape_info.border[i]);
+		for (int i = 0; i < sizeof(IDD_SETTING_FILLING) / sizeof(int); i++)
+			setInputValue(hDlg, IDD_SETTING_FILLING[i], local_shape_info.filling[i]);
+
 		break;
 	}
 
 
 	case WM_COMMAND:
 	{
-		switch (LOWORD(wParam))
+		int wmId = LOWORD(wParam);
+
+		int inputID = indexOf(IDD_SETTING_BORDER, wmId);
+		if (inputID != -1)
+		{
+			int value = GetDlgItemInt(hDlg, IDD_SETTING_BORDER[inputID], NULL, FALSE);
+
+			if (value < 0) value = 0, setInputValue(hDlg, IDD_SETTING_BORDER[inputID], 0);
+			if (value > 255) value = 255, setInputValue(hDlg, IDD_SETTING_BORDER[inputID], 255);
+
+			local_shape_info.border[inputID] = value;
+			initScrollbar(GetDlgItem(hDlg, IDD_SETTING_BORDER_BAR[inputID]), 255, local_shape_info.border[inputID]);
+		}
+
+		inputID = indexOf(IDD_SETTING_FILLING, wmId);
+		if (inputID != -1)
+		{
+			int value = GetDlgItemInt(hDlg, IDD_SETTING_FILLING[inputID], NULL, FALSE);
+
+			if (value < 0) value = 0, setInputValue(hDlg, IDD_SETTING_FILLING[inputID], 0);
+			if (value > 255) value = 255, setInputValue(hDlg, IDD_SETTING_FILLING[inputID], 255);
+
+			local_shape_info.filling[inputID] = value;
+			initScrollbar(GetDlgItem(hDlg, IDD_SETTING_FILLING_BAR[inputID]), 255, local_shape_info.filling[inputID]);
+		}
+
+
+		int radio = indexOf(IDD_SETTING_SCALE_X, wmId);
+		if (radio != -1)
+		{
+			local_shape_info.scale = radio;
+		}
+
+		switch (wmId)
 		{
 		case IDOK:
 			global_shape_info = local_shape_info;
