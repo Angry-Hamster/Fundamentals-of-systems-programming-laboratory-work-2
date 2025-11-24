@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <map>
 #include "framework.h"
 #include "Resource.h"
 
@@ -98,12 +99,13 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	return TRUE;
 }
 
+// Convert UTF-8 std::string -> wide string
 wstring StringToWide(const string& str) {
-	if (str.empty()) return wstring();
-	int size_needed = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
-	wstring wstr(size_needed, 0);
-	MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstr[0], size_needed);
-	return wstr;
+    if (str.empty()) return wstring();
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.size(), NULL, 0);
+    wstring wstr(size_needed, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.size(), &wstr[0], size_needed);
+    return wstr;
 }
 
 struct Color {
@@ -163,7 +165,7 @@ public:
 	int scale=0;
 	Color border;
 	Color filling;
-	vector<int> brush;
+	int brush =0;
 
 	shape_info() = default;
 
@@ -285,10 +287,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		RECT memRect = { 0, 0, width, height };
 		FillRect(hdcMem, &memRect, (HBRUSH)(COLOR_WINDOW + 1));
 
-		HPEN hOutlinePen = CreatePen(PS_SOLID, 2, global_shape_info.border.rgb());
+		HPEN hOutlinePen = CreatePen(PS_DOT, 2, global_shape_info.border.rgb());
 		HPEN hOldPen = (HPEN)SelectObject(hdcMem, hOutlinePen);
 
 		HBRUSH hBrush = CreateSolidBrush(global_shape_info.filling.rgb());
+		if(global_shape_info.brush != 0)
+		 hBrush = CreateHatchBrush(global_shape_info.brush, global_shape_info.filling.rgb());
 		HBRUSH hOldBrush = (HBRUSH)SelectObject(hdcMem, hBrush);
 
 		Polygon(hdcMem, square, size(square));
@@ -357,6 +361,17 @@ int indexOf(const int arr[], int seek)
 	return -1;
 }
 
+TCHAR stringToTCHAR(const string& str)
+{	
+	size_t newsize = str.size() + 1;
+	TCHAR* tcharStr = new TCHAR[newsize];
+	size_t convertedChars = 0;
+	mbstowcs_s(&convertedChars, tcharStr, newsize, str.c_str(), _TRUNCATE);
+	return *tcharStr;
+}
+
+
+
 const int IDD_SETTING_BORDER[] = { IDD_SETTING_BORDER_R, IDD_SETTING_BORDER_G, IDD_SETTING_BORDER_B };
 const int IDD_SETTING_BORDER_BAR[] = { IDD_SETTING_BORDER_BAR_R, IDD_SETTING_BORDER_BAR_G, IDD_SETTING_BORDER_BAR_B };
 
@@ -365,6 +380,8 @@ const int IDD_SETTING_FILLING_BAR[] = { IDD_SETTING_FILLING_BAR_R, IDD_SETTING_F
 
 const int IDD_SETTING_SCALE_X[] = { IDD_SETTING_SCALE_X1, IDD_SETTING_SCALE_X2, IDD_SETTING_SCALE_X3 };
 
+vector<string> IDC_BRUSH_TYPE_LIST = { "SOLID", "VERTICAL", "FDIAGONAL", "BDIAGONAL", "CROSS", "DIAGCROSS" };
+//vector<string> IDC_BRUSH_TYPE_LIST = { "SOLID_1", "VERTICAL_2", "FDIAGONAL_3", "BDIAGONAL_4", "CROSS_5", "DIAGCROSS_6" };
 
 INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {	
@@ -386,6 +403,11 @@ INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 			setInputValue(hDlg, IDD_SETTING_FILLING[i], global_shape_info.filling[i]);
 
 		CheckRadioButton(hDlg, IDD_SETTING_SCALE_X[0], IDD_SETTING_SCALE_X[(sizeof(IDD_SETTING_SCALE_X) / sizeof(IDD_SETTING_SCALE_X[0])) - 1], IDD_SETTING_SCALE_X[global_shape_info.scale]);
+
+		for (string element : IDC_BRUSH_TYPE_LIST) {
+			SendDlgItemMessageW(hDlg, IDC_BORDER_TYPE, LB_ADDSTRING, 0, (LPARAM)StringToWide(element).c_str());
+		}
+		SendDlgItemMessage(hDlg, IDC_BORDER_TYPE, LB_SETCURSEL, global_shape_info.brush, 0);
 
 		break;
 	}
@@ -439,6 +461,16 @@ INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 		if (radio != -1)
 		{
 			local_shape_info.scale = radio;
+		}
+
+
+		if (IDC_BORDER_TYPE == wmId)
+		{
+			int sel = (int)SendDlgItemMessage(hDlg, IDC_BORDER_TYPE, LB_GETCURSEL, 0, 0);
+			if (sel != LB_ERR)
+			{
+				local_shape_info.brush = sel;
+			}
 		}
 
 		switch (wmId)

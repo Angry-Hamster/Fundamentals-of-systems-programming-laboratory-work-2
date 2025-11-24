@@ -30,6 +30,7 @@
 #define IDD_SETTING_FILLING_BAR_R       1015
 #define IDD_SETTING_FILLING_BAR_G       1016
 #define IDD_SETTING_FILLING_BAR_B       1017
+#define IDC_BORDER_TYPE                 1022
 #define ID_EXIT                         32786
 #define ID_SETTING                      32787
 #define IDD_SETTING                     32788
@@ -41,7 +42,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        103
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1022
+#define _APS_NEXT_CONTROL_VALUE         1023
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif
