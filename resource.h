@@ -31,6 +31,8 @@
 #define IDD_SETTING_FILLING_BAR_G       1016
 #define IDD_SETTING_FILLING_BAR_B       1017
 #define IDC_BORDER_TYPE                 1022
+#define IDD_BORDER_COLOR                1027
+#define IDD_FILLING_COLOR               1028
 #define ID_EXIT                         32786
 #define ID_SETTING                      32787
 #define IDD_SETTING                     32788
@@ -40,9 +42,9 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        103
+#define _APS_NEXT_RESOURCE_VALUE        104
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1023
+#define _APS_NEXT_CONTROL_VALUE         1029
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

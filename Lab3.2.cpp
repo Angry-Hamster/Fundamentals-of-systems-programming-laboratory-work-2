@@ -381,12 +381,12 @@ const int IDD_SETTING_FILLING_BAR[] = { IDD_SETTING_FILLING_BAR_R, IDD_SETTING_F
 const int IDD_SETTING_SCALE_X[] = { IDD_SETTING_SCALE_X1, IDD_SETTING_SCALE_X2, IDD_SETTING_SCALE_X3 };
 
 vector<string> IDC_BRUSH_TYPE_LIST = { "SOLID", "VERTICAL", "FDIAGONAL", "BDIAGONAL", "CROSS", "DIAGCROSS" };
-//vector<string> IDC_BRUSH_TYPE_LIST = { "SOLID_1", "VERTICAL_2", "FDIAGONAL_3", "BDIAGONAL_4", "CROSS_5", "DIAGCROSS_6" };
+
+HBRUSH hGroupBrush = NULL;
 
 INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {	
 	static shape_info local_shape_info;
-
 
 	switch (message)
 	{
@@ -409,8 +409,30 @@ INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 		}
 		SendDlgItemMessage(hDlg, IDC_BORDER_TYPE, LB_SETCURSEL, global_shape_info.brush, 0);
 
+		hGroupBrush = CreateSolidBrush(RGB(255, 0, 0));
+
 		break;
 	}
+
+	case WM_CTLCOLORSTATIC:
+	{
+		HDC hdcStatic = (HDC)wParam;   // Контекст пристрою елемента
+		HWND hStatic = (HWND)lParam;   // Дескриптор (Handle) самого елемента
+
+		// 2. Перевіряємо, чи це саме наш Group Box (за його ID)
+		// Замініть IDC_MY_GROUPBOX на ваш реальний ID з resource.h
+		if (hStatic == GetDlgItem(hDlg, IDD_BORDER_COLOR))
+		{
+			// ВАЖЛИВО: Робимо фон тексту прозорим, інакше під текстом
+			// заголовка Group Box залишиться стандартний сірий прямокутник.
+			//SetBkColor(hdcStatic, RGB(255, 0, 0));
+
+			// 3. Повертаємо дескриптор нашого пензлика
+			// Система використає його для заливки фону
+			return (INT_PTR)hGroupBrush;
+		}
+	}
+	break;
 
 	case WM_HSCROLL:
 	{
@@ -484,7 +506,17 @@ INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 			EndDialog(hDlg, IDCANCEL);
 			return 0;
 		}
+
 		break;
+	}
+
+	case WM_DESTROY:{
+		if (hGroupBrush)
+		{
+			DeleteObject(hGroupBrush);
+			hGroupBrush = NULL;
+		}
+		return (INT_PTR)TRUE;
 	}
 
 	}
