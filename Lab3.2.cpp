@@ -11,6 +11,7 @@
 using namespace std;
 
 #define MAX_LOADSTRING 100
+#define ID_MY_TIMER 100
 
 // Global Variables:
 HINSTANCE hInst;                                // current instance
@@ -191,6 +192,20 @@ public:
 	}
 };
 
+void animateShape(RECT& rect, POINT& default_coord, int size)
+{
+	static int dx = 1;
+	static int dy = 1;
+
+	if (default_coord.x + size >= rect.right || default_coord.x - size <= rect.left)
+		dx = -dx;
+	if (default_coord.y + size >= rect.bottom || default_coord.y - size <= rect.top)
+		dy = -dy;
+
+	default_coord.x += dx;
+	default_coord.y += dy;
+};
+
 shape_info global_shape_info;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -199,10 +214,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	static POINT mouse_coord = { 0, 0 };
 	static POINT mouse_coord_correction = { 0, 0 };
 	static bool lcm = false;
+	static bool timer = false;
+	static RECT rect;
 	int scale = global_shape_info.scale +1;
 
 	static bool on_shape = false;
-	if (on_shape) SetCursor(LoadCursor(NULL, IDC_HAND));
+	if (on_shape && !timer) SetCursor(LoadCursor(NULL, IDC_HAND));
 	else SetCursor(LoadCursor(NULL, IDC_ARROW));
 
 
@@ -221,9 +238,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 	switch (message)
 	{
+	case WM_SIZING: {
+		GetClientRect(hWnd, &rect);
+	}
+	break;
+	case WM_TIMER: {
+		animateShape(rect, default_coord, 100*scale);
+	}
+	break;
 	case WM_LBUTTONDOWN:
 	{
-		if (on_shape)
+		if (on_shape && !timer)
 			lcm = true;
 	}
 	break;
@@ -255,9 +280,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	break;
 	case WM_CREATE:
 	{
-		RECT rect;
 		GetClientRect(hWnd, &rect);
 		default_coord = { (rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2 };
+
+		global_shape_info.border = Color(252, 186, 3);
+		global_shape_info.filling = Color(245, 216, 135);
 	}
 	break;
 	case WM_COMMAND:
@@ -267,6 +294,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 		case ID_EXIT: PostQuitMessage(0); break;
 		case ID_SETTING: DialogBox(hInst, MAKEINTRESOURCE(IDD_SETTING), hWnd, SettingsDlgProc); break;
+		case ID_ANIMATE_START: SetTimer(hWnd, ID_MY_TIMER, 10, NULL); timer = true; break;
+		case ID_ANIMATE_STOP: KillTimer(hWnd, ID_MY_TIMER); timer = false; break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
@@ -370,8 +399,6 @@ TCHAR stringToTCHAR(const string& str)
 	return *tcharStr;
 }
 
-
-
 const int IDD_SETTING_BORDER[] = { IDD_SETTING_BORDER_R, IDD_SETTING_BORDER_G, IDD_SETTING_BORDER_B };
 const int IDD_SETTING_BORDER_BAR[] = { IDD_SETTING_BORDER_BAR_R, IDD_SETTING_BORDER_BAR_G, IDD_SETTING_BORDER_BAR_B };
 
@@ -381,8 +408,6 @@ const int IDD_SETTING_FILLING_BAR[] = { IDD_SETTING_FILLING_BAR_R, IDD_SETTING_F
 const int IDD_SETTING_SCALE_X[] = { IDD_SETTING_SCALE_X1, IDD_SETTING_SCALE_X2, IDD_SETTING_SCALE_X3 };
 
 vector<string> IDC_BRUSH_TYPE_LIST = { "SOLID", "VERTICAL", "FDIAGONAL", "BDIAGONAL", "CROSS", "DIAGCROSS" };
-
-HBRUSH hGroupBrush = NULL;
 
 INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {	
@@ -409,30 +434,8 @@ INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 		}
 		SendDlgItemMessage(hDlg, IDC_BORDER_TYPE, LB_SETCURSEL, global_shape_info.brush, 0);
 
-		hGroupBrush = CreateSolidBrush(RGB(255, 0, 0));
-
 		break;
 	}
-
-	case WM_CTLCOLORSTATIC:
-	{
-		HDC hdcStatic = (HDC)wParam;   // Контекст пристрою елемента
-		HWND hStatic = (HWND)lParam;   // Дескриптор (Handle) самого елемента
-
-		// 2. Перевіряємо, чи це саме наш Group Box (за його ID)
-		// Замініть IDC_MY_GROUPBOX на ваш реальний ID з resource.h
-		if (hStatic == GetDlgItem(hDlg, IDD_BORDER_COLOR))
-		{
-			// ВАЖЛИВО: Робимо фон тексту прозорим, інакше під текстом
-			// заголовка Group Box залишиться стандартний сірий прямокутник.
-			//SetBkColor(hdcStatic, RGB(255, 0, 0));
-
-			// 3. Повертаємо дескриптор нашого пензлика
-			// Система використає його для заливки фону
-			return (INT_PTR)hGroupBrush;
-		}
-	}
-	break;
 
 	case WM_HSCROLL:
 	{
@@ -511,11 +514,6 @@ INT_PTR CALLBACK SettingsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM 
 	}
 
 	case WM_DESTROY:{
-		if (hGroupBrush)
-		{
-			DeleteObject(hGroupBrush);
-			hGroupBrush = NULL;
-		}
 		return (INT_PTR)TRUE;
 	}
 
